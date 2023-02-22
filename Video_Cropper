@@ -1,0 +1,83 @@
+Video Cropper
+for multi-box video monitoring
+Procedures
+Update params
+determine a ROI for each box (until satisfied, you may repeat this step)
+crop frames in parallel
+
+Params
+All params must be checked for each video
+clearvars;
+close all;
+
+% path info
+Dpath ='C:\Users\Katriona\Desktop\Batch 1\OF';
+MyAVI = 'Batch1_OF_001.avi';
+
+% boxes
+BoxList = 1:4;
+nBoxes = length(BoxList);
+
+% Animal names
+AnimalNames = {'FAD1', 'FAD2', 'FAD3', 'FAD4'};
+
+% test type
+Ttype = 'OF'; % open field
+% Ttype = 'EN'; % encoding phase
+% Ttype = 'RE'; % retention phase
+
+Determine ROIs -- manual
+Determine a ROI for each box. If you are not satisfied, repeat this step.
+Box arrangement:
+Box1, Box2
+Box3, Box4
+% get an initial frame to determine ROIs
+Vobj = VideoReader(fullfile(Dpath, MyAVI));
+Frame1 = readFrame(Vobj);
+
+% ROI selection box-by-box
+ROI =[];
+for b = 1:nBoxes
+close all;
+imshow(Frame1);
+MyROI = drawrectangle;
+ROI(b).pos = MyROI.Position;
+end
+
+% save
+save(fullfile(Dpath,'ROIinfo.mat'),"ROI","Frame1");
+
+% display
+figure;
+for b = 1:nBoxes
+subplot(2,2,BoxList(b));
+imshow(imcrop(Frame1, ROI(b).pos));
+end
+
+
+crop video (parallel processing)
+if you are happy with all ROIs, then run this section. This section requires Parallel Computing Toolbox. Although it depends on a computer resource, it may take ~8 min for a 20-min long video. Be patient. 
+parfor b = 1:nBoxes
+% reading the raw video (redundant, but this requires for parallel processing ...)
+Vobj = VideoReader(fullfile(Dpath, MyAVI));
+
+% preparation
+MyBox = BoxList(b);
+fprintf(['Box#', num2str(MyBox), '...\n']);
+% MyVname = ['Box', num2str(MyBox),'.avi'];
+MyVname = [AnimalNames{b}, '_', Ttype, '.avi'];
+v = VideoWriter(fullfile(Dpath, MyVname),'Motion JPEG AVI');
+v.FrameRate = Vobj.FrameRate;
+open(v);
+% core - create a cropped video
+while hasFrame(Vobj)
+MyFrame = im2gray(readFrame(Vobj)); % grayscale frame
+MyCroppedFrame = imcrop(MyFrame, ROI(b).pos); % cropped frame
+v.writeVideo(MyCroppedFrame);
+end
+
+close(v);
+end
+
+fprintf('all cropped!!\n');
+
